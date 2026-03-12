@@ -2,6 +2,16 @@
 node_modules/
 
 # build output
+release/
+dist-electron/
+*.dmg
+*.exe
+*.app
+out/
+
+# Electron 
+electron-builder-effective-config.json
+
 dist/
 build/
 
