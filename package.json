@@ -1,7 +1,7 @@
 {
   "name": "app",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
@@ -11,8 +11,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron:dev": "concurrently \"tsx watch server/index.ts\" \"vite\" \"wait-on tcp:3001 tcp:5173 && cross-env NODE_ENV=development electron .\"",
-    "electron:build": "npm run build && node electron/build.mjs && electron-builder",
-    "electron:pack": "npm run build && node electron/build.mjs && electron-builder --dir"
+    "icon:generate": "node electron/generate-icon.mjs",
+    "electron:build": "npm run icon:generate && npm run build && node electron/build.mjs && electron-builder",
+    "electron:pack": "npm run icon:generate && npm run build && node electron/build.mjs && electron-builder --dir"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
@@ -22,28 +23,29 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.3",
-    "concurrently": "^9.1.2",
-    "cross-env": "^7.0.3",
-    "esbuild": "^0.25.0",
-    "electron": "^36.0.0",
-    "electron-builder": "^25.1.8",
-    "tsx": "^4.19.4",
-    "wait-on": "^8.0.3",
-    "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^36.0.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.25.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "sharp": "^0.34.5",
+    "tsx": "^4.19.4",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "wait-on": "^8.0.3"
   },
   "build": {
     "appId": "com.potsinc.timetrace",
@@ -62,15 +64,37 @@
     ],
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] },
-        { "target": "zip", "arch": ["arm64", "x64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "category": "public.app-category.productivity"
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
