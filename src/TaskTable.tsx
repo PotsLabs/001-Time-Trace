@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './styles/PotsStyles.css';
-import supabase from '../utils/Supabase.tsx';
 import Timer from './Timer';
 import DotCalendar from './DotCalendar';
 import Modal from './Modal';
@@ -18,6 +17,7 @@ interface Task {
 
 interface ActiveTimer {
   taskId: number;
+  startTime: Date;
 }
 
 const TaskTable: React.FC = () => {
@@ -82,184 +82,63 @@ const TaskTable: React.FC = () => {
     return dateStr;
   };
 
-  // Fetch projects from Supabase
-  const fetchProjects = async (): Promise<{ tasks: Task[], idMap: { [key: number]: string } }> => {
-    try {
-      const { data: projects, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('status', 'active');
-
-      if (error) {
-        console.error('Error fetching projects:', error);
-        return { tasks: [], idMap: {} };
-      }
-
-      if (!projects || projects.length === 0) {
-        return { tasks: [], idMap: {} };
-      }
-
-      // Store UUID mappings for existing projects
-      const newProjectIdMap: { [key: number]: string } = {};
-      const localTasks: Task[] = [];
-
-      projects.forEach((project, index) => {
-        const localId = index + 1; // Use sequential local IDs
-        newProjectIdMap[localId] = project.id;
-        
-        localTasks.push({
-          id: localId,
-          name: project.name,
-          description: project.description || '',
-          estimate_hours: project.estimate_hours || 0,
-          time_entries: {}
-        });
-      });
-
-      setProjectIdMap(newProjectIdMap);
-      setNextId(projects.length + 1);
-      
-      return { tasks: localTasks, idMap: newProjectIdMap };
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-      return { tasks: [], idMap: {} };
-    }
+  // Fetch projects from local API
+  const fetchProjects = async (): Promise<Task[]> => {
+    const res = await fetch('/api/projects');
+    const projects: any[] = await res.json();
+    return projects.map(p => ({
+      id: p.id,
+      name: p.name,
+      description: p.description || '',
+      estimate_hours: p.estimate_hours || 0,
+      time_entries: {}
+    }));
   };
 
-  // Fetch time entries for all projects
-  const fetchTimeEntries = async (tasks: Task[], idMap: { [key: number]: string }): Promise<Task[]> => {
+  // Fetch time entries for all projects and merge into tasks
+  const fetchTimeEntries = async (tasks: Task[]): Promise<Task[]> => {
     if (tasks.length === 0) return tasks;
 
-    try {
-      // Get all project UUIDs
-      const projectUuids = tasks.map(task => idMap[task.id]).filter(Boolean);
-      
-      if (projectUuids.length === 0) return tasks;
+    const ids = tasks.map(t => t.id).join(',');
+    const res = await fetch(`/api/time-entries?project_ids=${ids}`);
+    const entries: any[] = await res.json();
 
-      const { data: timeEntries, error } = await supabase
-        .from('time_entries')
-        .select('*')
-        .in('project_id', projectUuids);
+    const byProject: { [key: number]: any[] } = {};
+    entries.forEach(e => {
+      if (!byProject[e.project_id]) byProject[e.project_id] = [];
+      byProject[e.project_id].push(e);
+    });
 
-      if (error) {
-        console.error('Error fetching time entries:', error);
-        return tasks;
-      }
-
-      if (!timeEntries || timeEntries.length === 0) {
-        return tasks;
-      }
-
-      // Group time entries by project UUID
-      const timeEntriesByProject: { [key: string]: any[] } = {};
-      timeEntries.forEach(entry => {
-        if (!timeEntriesByProject[entry.project_id]) {
-          timeEntriesByProject[entry.project_id] = [];
-        }
-        timeEntriesByProject[entry.project_id].push(entry);
+    return tasks.map(task => {
+      const taskEntries = byProject[task.id] || [];
+      const time_entries: { [date: string]: number } = {};
+      taskEntries.forEach(e => {
+        time_entries[convertDbDateToDisplay(e.date)] = e.duration / 3600;
       });
-
-      // Update tasks with time entries
-      return tasks.map(task => {
-        const projectUuid = idMap[task.id];
-        const entries = timeEntriesByProject[projectUuid] || [];
-        
-        const timeEntriesObj: { [date: string]: number } = {};
-        entries.forEach(entry => {
-          const displayDate = convertDbDateToDisplay(entry.date);
-          timeEntriesObj[displayDate] = entry.duration / 3600; // Convert seconds to hours
-        });
-
-        return {
-          ...task,
-          time_entries: timeEntriesObj
-        };
-      });
-    } catch (error) {
-      console.error('Error fetching time entries:', error);
-      return tasks;
-    }
+      return { ...task, time_entries };
+    });
   };
 
-  // Load data from Supabase on component mount
+  // Load data from local SQLite on component mount
   const loadData = async () => {
     setIsLoading(true);
-    isLoadingData.current = true; // Prevent autosave during load
+    isLoadingData.current = true;
     try {
-      // Fetch projects first
-      const { tasks: projects, idMap } = await fetchProjects();
-      
-      if (projects.length === 0) {
-        // No existing data, set default projects
-        const defaultTasks: Task[] = [
-          { 
-            id: 1, 
-            name: 'POTS3 - R&D Project', 
-            description: 'All work done for Pots Industries Development', 
-            estimate_hours: 150,
-            time_entries: {
-              '6-Feb': 0.25,
-              '7-Feb': 0.25
-            }
-          },
-          { 
-            id: 2, 
-            name: 'Pots - Study Work', 
-            description: 'Time Spent on Masters course Work', 
-            estimate_hours: 150,
-            time_entries: {
-              '6-Feb': 0.5,
-              '7-Feb': 0.5
-            }
-          }
-        ];
-        setTasks(defaultTasks);
-        setNextId(3);
-      } else {
-        // Fetch time entries for the projects using the idMap
-        const tasksWithTimeEntries = await fetchTimeEntries(projects, idMap);
-        setTasks(tasksWithTimeEntries);
-      }
+      const projects = await fetchProjects();
+      const tasksWithEntries = await fetchTimeEntries(projects);
+      setTasks(tasksWithEntries);
     } catch (error) {
       console.error('Error loading data:', error);
-      // Fallback to default data
-      const defaultTasks: Task[] = [
-        { 
-          id: 1, 
-          name: 'POTS3 - R&D Project', 
-          description: 'All work done for Pots Industries Development', 
-          estimate_hours: 150,
-          time_entries: {
-            '6-Feb': 0.25,
-            '7-Feb': 0.25
-          }
-        },
-        { 
-          id: 2, 
-          name: 'Pots - Study Work', 
-          description: 'Time Spent on Masters course Work', 
-          estimate_hours: 150,
-          time_entries: {
-            '6-Feb': 0.5,
-            '7-Feb': 0.5
-          }
-        }
-      ];
-      setTasks(defaultTasks);
-      setNextId(3);
     } finally {
       setIsLoading(false);
-      // Small delay to ensure state has settled before enabling autosave
-      setTimeout(() => {
-        isLoadingData.current = false;
-      }, 500);
+      setTimeout(() => { isLoadingData.current = false; }, 500);
     }
   };
 
-  const [nextId, setNextId] = useState(3);
   const [isSaving, setIsSaving] = useState(false);
-  const [projectIdMap, setProjectIdMap] = useState<{ [key: number]: string }>({}); // Map local IDs to UUIDs
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null);
+  const [editingCell, setEditingCell] = useState<{ taskId: number; dateKey: string } | null>(null);
+  const [editingValue, setEditingValue] = useState('');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const saveTimeoutRef = useRef<number | null>(null);
   const isInitialMount = useRef(true);
@@ -299,7 +178,7 @@ const TaskTable: React.FC = () => {
 
     // Set new timeout to save after 2 seconds of inactivity
     saveTimeoutRef.current = setTimeout(() => {
-      saveToSupabase(true); // Pass true to indicate autosave
+      saveTimeEntries(true);
     }, 2000);
 
     // Cleanup timeout on unmount
@@ -312,11 +191,24 @@ const TaskTable: React.FC = () => {
 
   const handlePlayButton = (taskId: number) => {
     if (activeTimer?.taskId === taskId) {
-      // Stop the timer
+      // Stop: record the completed session
+      const endTime = new Date();
+      const duration = Math.round((endTime.getTime() - activeTimer.startTime.getTime()) / 1000);
+      fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: taskId,
+          date: convertDisplayDateToDb(getTodayKey()),
+          start_time: activeTimer.startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          duration
+        })
+      });
       setActiveTimer(null);
     } else {
-      // Start timer for this task
-      setActiveTimer({ taskId });
+      // Start timer — capture wall-clock start
+      setActiveTimer({ taskId, startTime: new Date() });
     }
   };
 
@@ -349,123 +241,27 @@ const TaskTable: React.FC = () => {
     return Math.floor(hours * 3600);
   };
 
-  const saveToSupabase = async (isAutoSave: boolean = false) => {
+  const saveTimeEntries = async (isAutoSave: boolean = false) => {
     setIsSaving(true);
     try {
-      // First, save all projects and get their UUIDs
-      const projectUuids: { [key: number]: string } = {};
-      
       for (const task of tasks) {
-        const existingUuid = projectIdMap[task.id];
-        
-        if (existingUuid) {
-          // Update existing project
-          const { data: projectData, error: projectError } = await supabase
-            .from('projects')
-            .update({
-              name: task.name,
-              description: task.description,
-              estimate_hours: task.estimate_hours,
-              status: 'active',
-              client_id: null
-            })
-            .eq('id', existingUuid)
-            .select()
-            .single();
-
-          if (projectError) {
-            console.error('Error updating project:', projectError);
-            continue;
-          }
-          
-          projectUuids[task.id] = projectData.id;
-        } else {
-          // Create new project
-          const { data: projectData, error: projectError } = await supabase
-            .from('projects')
-            .insert({
-              name: task.name,
-              description: task.description,
-              estimate_hours: task.estimate_hours,
-              status: 'active',
-              client_id: null
-            })
-            .select()
-            .single();
-
-          if (projectError) {
-            console.error('Error creating project:', projectError);
-            continue;
-          }
-          
-          projectUuids[task.id] = projectData.id;
-        }
-      }
-
-      // Update the projectIdMap with any new UUIDs
-      setProjectIdMap(prev => ({ ...prev, ...projectUuids }));
-
-      // Then save time entries for each project
-      for (const task of tasks) {
-        const projectUuid = projectUuids[task.id];
-        if (!projectUuid) continue;
-
-        // Get existing time entries for this project
-        const { data: existingEntries } = await supabase
-          .from('time_entries')
-          .select('id, date')
-          .eq('project_id', projectUuid);
-
-        // Create a map of existing entries by date
-        const existingEntriesMap = new Map(
-          (existingEntries || []).map(entry => [entry.date, entry.id])
-        );
-
-        // Save all time entries for this project
         for (const [dateKey, hours] of Object.entries(task.time_entries)) {
-          // Convert date format from "6-Feb" to "2026-02-06"
-          const dateString = convertDisplayDateToDb(dateKey);
-          const duration = Math.round(hours * 3600); // Convert hours to seconds
-
-          const existingEntryId = existingEntriesMap.get(dateString);
-
-          if (existingEntryId) {
-            // Update existing entry by ID
-            const { error: updateError } = await supabase
-              .from('time_entries')
-              .update({ duration: duration })
-              .eq('id', existingEntryId);
-
-            if (updateError) {
-              console.error('Error updating time entry:', updateError);
-            }
-          } else {
-            // Insert new entry
-            const { error: insertError } = await supabase
-              .from('time_entries')
-              .insert({
-                project_id: projectUuid,
-                date: dateString,
-                duration: duration,
-                description: null
-              });
-
-            if (insertError) {
-              console.error('Error inserting time entry:', insertError);
-            }
-          }
+          await fetch('/api/time-entries', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              project_id: task.id,
+              date: convertDisplayDateToDb(dateKey),
+              duration: Math.round(hours * 3600)
+            })
+          });
         }
       }
-
       setLastSaved(new Date());
-      if (!isAutoSave) {
-        alert('Data saved successfully!');
-      }
+      if (!isAutoSave) alert('Data saved successfully!');
     } catch (error) {
-      console.error('Error saving to Supabase:', error);
-      if (!isAutoSave) {
-        alert('Error saving data. Check console for details.');
-      }
+      console.error('Error saving time entries:', error);
+      if (!isAutoSave) alert('Error saving data. Check console for details.');
     } finally {
       setIsSaving(false);
     }
@@ -475,21 +271,25 @@ const TaskTable: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleCreateProject = (formData: { name: string; description: string; estimate_hours: number }) => {
-    const newTask: Task = {
-      id: nextId,
-      name: formData.name,
-      description: formData.description,
-      estimate_hours: formData.estimate_hours,
-      time_entries: {}
-    };
-    
-    setTasks([...tasks, newTask]);
-    setNextId(nextId + 1);
-    setIsModalOpen(false);
-    
-    // Save to Supabase immediately when creating a new project
-    saveToSupabase(false);
+  const handleCreateProject = async (formData: { name: string; description: string; estimate_hours: number }) => {
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      const project = await res.json();
+      setTasks(prev => [...prev, {
+        id: project.id,
+        name: project.name,
+        description: project.description || '',
+        estimate_hours: project.estimate_hours || 0,
+        time_entries: {}
+      }]);
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error creating project:', error);
+    }
   };
 
   const handleCancelModal = () => {
@@ -501,29 +301,69 @@ const TaskTable: React.FC = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateProject = (formData: { name: string; description: string; estimate_hours: number }) => {
-    setTasks(prevTasks =>
-      prevTasks.map(task =>
-        task.id === editingTaskId
-          ? {
-              ...task,
-              name: formData.name,
-              description: formData.description,
-              estimate_hours: formData.estimate_hours
-            }
-          : task
-      )
-    );
-    setIsEditModalOpen(false);
-    setEditingTaskId(null);
-    
-    // Save to Supabase immediately when updating a project
-    saveToSupabase(false);
+  const handleUpdateProject = async (formData: { name: string; description: string; estimate_hours: number }) => {
+    if (!editingTaskId) return;
+    try {
+      await fetch(`/api/projects/${editingTaskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      setTasks(prev => prev.map(task =>
+        task.id === editingTaskId ? { ...task, ...formData } : task
+      ));
+      setIsEditModalOpen(false);
+      setEditingTaskId(null);
+    } catch (error) {
+      console.error('Error updating project:', error);
+    }
   };
 
   const handleCancelEditModal = () => {
     setIsEditModalOpen(false);
     setEditingTaskId(null);
+  };
+
+  const handleCellClick = (task: Task, dateKey: string) => {
+    const hours = task.time_entries[dateKey] || 0;
+    setEditingCell({ taskId: task.id, dateKey });
+    setEditingValue(hours > 0 ? formatTime(hours) : '');
+  };
+
+  // Accepts H:MM or a plain decimal number
+  const parseTimeInput = (value: string): number | null => {
+    const trimmed = value.trim();
+    if (trimmed === '' || trimmed === '-') return 0;
+    if (trimmed.includes(':')) {
+      const [h, m] = trimmed.split(':').map(Number);
+      if (isNaN(h) || isNaN(m)) return null;
+      return h + m / 60;
+    }
+    const n = parseFloat(trimmed);
+    return isNaN(n) ? null : n;
+  };
+
+  const commitCellEdit = (taskId: number, dateKey: string) => {
+    const hours = parseTimeInput(editingValue);
+    if (hours === null) {
+      setEditingCell(null);
+      return;
+    }
+    setTasks(prev => prev.map(task =>
+      task.id === taskId
+        ? { ...task, time_entries: { ...task.time_entries, [dateKey]: hours } }
+        : task
+    ));
+    fetch('/api/time-entries', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: taskId,
+        date: convertDisplayDateToDb(dateKey),
+        duration: Math.round(hours * 3600)
+      })
+    });
+    setEditingCell(null);
   };
 
   const calculateProgress = (task: Task) => {
@@ -613,9 +453,30 @@ const TaskTable: React.FC = () => {
                     {displayDates.map((date, index) => {
                       const dateKey = formatDate(date);
                       const hours = task.time_entries[dateKey] || 0;
+                      const isEditing = editingCell?.taskId === task.id && editingCell?.dateKey === dateKey;
                       return (
                         <td key={index} className="time-cell">
-                          {hours > 0 ? formatTime(hours) : '-'}
+                          {isEditing ? (
+                            <input
+                              className="time-cell-input"
+                              type="text"
+                              value={editingValue}
+                              autoFocus
+                              onChange={e => setEditingValue(e.target.value)}
+                              onBlur={() => commitCellEdit(task.id, dateKey)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') commitCellEdit(task.id, dateKey);
+                                if (e.key === 'Escape') setEditingCell(null);
+                              }}
+                            />
+                          ) : (
+                            <span
+                              className="time-cell-value"
+                              onClick={() => handleCellClick(task, dateKey)}
+                            >
+                              {hours > 0 ? formatTime(hours) : '-'}
+                            </span>
+                          )}
                         </td>
                       );
                     })}
@@ -628,9 +489,9 @@ const TaskTable: React.FC = () => {
             <button className="add-task-button" onClick={handleAddTask}>
               +
             </button>
-            <button 
-              className="save-button" 
-              onClick={() => saveToSupabase(false)}
+            <button
+              className="save-button"
+              onClick={() => saveTimeEntries(false)}
               disabled={isSaving}
             >
               {isSaving ? 'Saving...' : 'Save'}

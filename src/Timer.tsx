@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface TimerProps {
   taskId: number;
@@ -8,22 +8,20 @@ interface TimerProps {
 }
 
 const Timer: React.FC<TimerProps> = ({ taskId, initialSeconds, onTimeUpdate }) => {
+  // Anchor the wall-clock start so elapsed time is always Date.now()-based,
+  // unaffected by tab throttling or skipped ticks.
+  const startTimestamp = useRef(Date.now() - initialSeconds * 1000);
   const [totalSeconds, setTotalSeconds] = useState(initialSeconds);
-  const [isRunning] = useState(true);
 
   useEffect(() => {
-    if (!isRunning) return;
-
     const interval = setInterval(() => {
-      setTotalSeconds((prev) => {
-        const newTotal = prev + 1;
-        onTimeUpdate(taskId, newTotal);
-        return newTotal;
-      });
+      const elapsed = Math.floor((Date.now() - startTimestamp.current) / 1000);
+      setTotalSeconds(elapsed);
+      onTimeUpdate(taskId, elapsed);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRunning]); // Remove onTimeUpdate and taskId from dependencies
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
