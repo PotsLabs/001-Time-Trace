@@ -4,6 +4,7 @@ import Timer from './Timer';
 import DotCalendar from './DotCalendar';
 import Modal from './Modal';
 import ProjectForm from './ProjectForm';
+import DeletedProjects from './DeletedProjects';
 
 interface Task {
   id: number;
@@ -148,9 +149,9 @@ const TaskTable: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
-  const [_isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [_isAdjustDateModalOpen, setIsAdjustDateModalOpen] = useState(false);
-  const [_taskToDelete, setTaskToDelete] = useState<number | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<number | null>(null);
+  const [isDeletedListOpen, setIsDeletedListOpen] = useState(false);
   const [_taskToAdjustDate, setTaskToAdjustDate] = useState<number | null>(null);
 
   // Load data on component mount
@@ -316,6 +317,23 @@ const TaskTable: React.FC = () => {
       setEditingTaskId(null);
     } catch (error) {
       console.error('Error updating project:', error);
+    }
+  };
+
+  // Soft delete: the project leaves this list, its time stays available in Visualise
+  const handleDeleteProject = async () => {
+    if (taskToDelete == null) return;
+    const id = taskToDelete;
+    try {
+      if (activeTimer?.taskId === id) handlePlayButton(id); // stop and record the running session first
+      await saveTimeEntries(true);
+      await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+      setTasks(prev => prev.filter(task => task.id !== id));
+    } catch (error) {
+      console.error('Error deleting project:', error);
+    } finally {
+      setTaskToDelete(null);
+      setEditingTaskId(null);
     }
   };
 
@@ -501,6 +519,9 @@ const TaskTable: React.FC = () => {
                 Last saved: {lastSaved.toLocaleTimeString()}
               </span>
             )}
+            <button className="save-button deleted-projects-button" onClick={() => setIsDeletedListOpen(true)}>
+              Deleted projects
+            </button>
           </div>
         </>
       )}
@@ -523,7 +544,6 @@ const TaskTable: React.FC = () => {
         showActions={true}
         onDelete={() => {
           setTaskToDelete(editingTaskId);
-          setIsDeleteModalOpen(true);
           setIsEditModalOpen(false);
         }}
         onAdjustDate={() => {
@@ -544,6 +564,31 @@ const TaskTable: React.FC = () => {
             isEditing={true}
           />
         )}
+      </Modal>
+
+      <DeletedProjects
+        isOpen={isDeletedListOpen}
+        onClose={() => setIsDeletedListOpen(false)}
+        onRestored={loadData}
+      />
+
+      <Modal
+        isOpen={taskToDelete != null}
+        onClose={() => setTaskToDelete(null)}
+        title="Delete Project"
+      >
+        <p>
+          Remove <strong>{tasks.find(t => t.id === taskToDelete)?.name}</strong> from your projects?
+          Its tracked time is kept and can still be shown in Visualise.
+        </p>
+        <div className="form-actions">
+          <button type="button" className="form-cancel-button" onClick={() => setTaskToDelete(null)}>
+            Cancel
+          </button>
+          <button type="button" className="form-submit-button" onClick={handleDeleteProject}>
+            Delete
+          </button>
+        </div>
       </Modal>
     </div>
   );

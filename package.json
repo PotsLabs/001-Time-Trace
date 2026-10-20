@@ -1,7 +1,7 @@
 {
   "name": "app",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.1.0",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
@@ -16,8 +16,20 @@
     "electron:pack": "npm run icon:generate && npm run build && node electron/build.mjs && electron-builder --dir"
   },
   "dependencies": {
+    "@visx/annotation": "^4.0.0",
+    "@visx/axis": "^4.0.0",
+    "@visx/brush": "^4.0.0",
+    "@visx/curve": "^4.0.0",
+    "@visx/event": "^4.0.0",
+    "@visx/grid": "^4.0.0",
+    "@visx/group": "^4.0.0",
+    "@visx/responsive": "^4.0.0",
+    "@visx/scale": "^4.0.0",
+    "@visx/shape": "^4.0.0",
+    "@visx/tooltip": "^4.0.0",
     "better-sqlite3": "^11.10.0",
     "cors": "^2.8.5",
+    "d3-array": "^3.2.4",
     "express": "^4.21.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
@@ -26,6 +38,7 @@
     "@eslint/js": "^9.39.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.17",
+    "@types/d3-array": "^3.2.2",
     "@types/express": "^5.0.3",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
@@ -79,7 +92,12 @@
           ]
         }
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "electron/entitlements.mac.plist",
+      "entitlementsInherit": "electron/entitlements.mac.plist",
+      "notarize": true
     },
     "win": {
       "target": [
@@ -102,6 +120,14 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true
     },
-    "npmRebuild": true
+    "npmRebuild": true,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "PotsLabs",
+        "repo": "001-time-trace",
+        "releaseType": "draft"
+      }
+    ]
   }
 }

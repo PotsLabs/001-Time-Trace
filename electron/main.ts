@@ -34,6 +34,7 @@ function startServer() {
   process.env.PORT = String(SERVER_PORT);
   process.env.DB_PATH = path.join(app.getPath('userData'), 'timetrace.db');
   process.env.STATIC_PATH = path.join(__dirname, '..', 'dist');
+  process.env.ENV_FILE = path.join(app.getPath('userData'), '.env'); // e.g. ANTHROPIC_API_KEY
   // Side-effect import starts Express
   return import('./server.cjs');
 }
