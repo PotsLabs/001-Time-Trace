@@ -43,7 +43,8 @@ const Visualise: React.FC = () => {
   // One width for every chart: they all span the content column
   const { parentRef: widthRef, width } = useParentSize({ ignoreDimensions: 'height', debounceTime: 50 });
 
-  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [raw, setRaw] = useState<AnalyticsData | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [callouts, setCallouts] = useState<Callout[]>([]);
   const [range, setRange] = useState<DateRange>(DEFAULT_RANGE);
   const [brushKey, setBrushKey] = useState(0); // bump to re-seat the brush after an external range change
@@ -67,11 +68,12 @@ const Visualise: React.FC = () => {
       fetch('/api/analytics').then(r => r.json()),
       fetch('/api/callouts').then(r => r.json()),
     ]).then(([analytics, savedCallouts]: [AnalyticsData, Callout[]]) => {
-      setData(analytics);
+      setRaw(analytics);
       setSelected(new Set(analytics.projects.map(p => p.id)));
       setCallouts(savedCallouts);
-      // Start the comparison with the four busiest projects in the default range
-      const hours = hoursByProject(analytics.entries.filter(e => inRange(e.date, DEFAULT_RANGE)));
+      // Start the comparison with the four busiest (non-deleted) projects in the default range
+      const active = new Set(analytics.projects.filter(p => p.status !== 'deleted').map(p => p.id));
+      const hours = hoursByProject(analytics.entries.filter(e => active.has(e.project_id) && inRange(e.date, DEFAULT_RANGE)));
       const top = [...hours].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id]) => id);
       setLineSlots(new Map(top.map((id, slot) => [id, slot])));
     });
@@ -98,6 +100,21 @@ const Visualise: React.FC = () => {
   };
 
   // --- Derived data -----------------------------------------------------------
+  // Deleted projects keep their history but stay out of every view unless the switch is on
+  const deletedCount = raw?.projects.filter(p => p.status === 'deleted').length ?? 0;
+  const data = useMemo<AnalyticsData | null>(() => {
+    if (!raw) return null;
+    const projects = raw.projects
+      .filter(p => showDeleted || p.status !== 'deleted')
+      .map(p => (p.status === 'deleted' ? { ...p, name: `${p.name} (deleted)` } : p));
+    const visible = new Set(projects.map(p => p.id));
+    return {
+      projects,
+      entries: raw.entries.filter(e => visible.has(e.project_id)),
+      sessions: raw.sessions.filter(s => visible.has(s.project_id)),
+    };
+  }, [raw, showDeleted]);
+
   const projectNames = useMemo(() => new Map((data?.projects ?? []).map(p => [p.id, p.name])), [data]);
 
   const extent = useMemo<DateRange>(() => ({ from: data?.entries[0]?.date ?? daysAgo(30), to: today() }), [data]);
@@ -347,6 +364,12 @@ const Visualise: React.FC = () => {
               </div>
             )}
           </section>
+
+          <label className="viz-switch">
+            <input type="checkbox" checked={showDeleted} onChange={e => setShowDeleted(e.target.checked)} />
+            <span className="viz-switch-track" aria-hidden="true"><span className="viz-switch-thumb" /></span>
+            Show deleted projects{deletedCount ? ` (${deletedCount})` : ''}
+          </label>
         </>
       )}
     </div>

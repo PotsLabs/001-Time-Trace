@@ -34,6 +34,13 @@ const stmts = {
   insertProject:  db.prepare("INSERT INTO projects (name, description, estimate_hours) VALUES (?, ?, ?) RETURNING *"),
   getProject:     db.prepare('SELECT * FROM projects WHERE id = ?'),
   updateProject:  db.prepare("UPDATE projects SET name=?, description=?, estimate_hours=?, updated_at=datetime('now') WHERE id=? RETURNING *"),
+  softDeleteProject: db.prepare("UPDATE projects SET status='deleted', updated_at=datetime('now') WHERE id=?"),
+  restoreProject: db.prepare("UPDATE projects SET status='active', updated_at=datetime('now') WHERE id=? AND status='deleted'"),
+  listDeleted:    db.prepare(`
+    SELECT p.id, p.name, p.updated_at AS deleted_at, COALESCE(SUM(te.duration), 0) / 3600.0 AS hours
+    FROM projects p LEFT JOIN time_entries te ON te.project_id = p.id
+    WHERE p.status = 'deleted' GROUP BY p.id ORDER BY p.updated_at DESC
+  `),
 
   upsertTimeEntry: db.prepare(`
     INSERT INTO time_entries (project_id, date, duration) VALUES (?, ?, ?)
@@ -192,6 +199,24 @@ app.put('/api/projects/:id', (req, res) => {
   const { name, description, estimate_hours } = req.body;
   const project = stmts.updateProject.get(name, description ?? null, estimate_hours ?? 0, req.params.id);
   res.json(project);
+});
+
+// GET /api/projects/deleted — soft-deleted projects, newest first, with their tracked hours
+app.get('/api/projects/deleted', (_req, res) => {
+  res.json(stmts.listDeleted.all());
+});
+
+// POST /api/projects/restore { ids } — put deleted projects back on the list
+app.post('/api/projects/restore', (req, res) => {
+  const ids: number[] = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Boolean) : [];
+  db.transaction(() => ids.forEach(id => stmts.restoreProject.run(id)))();
+  res.json({ ok: true, restored: ids.length });
+});
+
+// DELETE /api/projects/:id — soft delete: hidden from the project list, history kept for Visualise
+app.delete('/api/projects/:id', (req, res) => {
+  stmts.softDeleteProject.run(req.params.id);
+  res.json({ ok: true });
 });
 
 // GET /api/time-entries?project_ids=1,2,3

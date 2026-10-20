@@ -1029,6 +1029,56 @@ p {
 .legend-swatch.timed { background-color: var(--color-text-primary); }
 .legend-swatch.placed { background-color: var(--color-placed); }
 
+/* Switch (show deleted projects) */
+.viz-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  font-size: var(--font-size-body);
+  cursor: pointer;
+  user-select: none;
+}
+
+.viz-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.viz-switch-track {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border: 1px solid var(--color-text-primary);
+  border-radius: 9px;
+  transition: background-color 0.2s ease;
+}
+
+.viz-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--color-text-primary);
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.viz-switch input:checked + .viz-switch-track {
+  background-color: var(--color-text-primary);
+}
+
+.viz-switch input:checked + .viz-switch-track .viz-switch-thumb {
+  transform: translateX(14px);
+  background-color: var(--color-background);
+}
+
+.viz-switch input:focus-visible + .viz-switch-track {
+  box-shadow: 0 0 0 2px var(--color-background), 0 0 0 3px var(--color-accent);
+}
+
 /* Timeline average line label */
 .trend-chart .average-label {
   font-size: 13px;
@@ -1431,4 +1481,43 @@ p {
   .viz-kpis { grid-template-columns: repeat(2, 1fr); }
   .summary-insights { grid-template-columns: 1fr; }
   .summary-stats { grid-template-columns: 1fr 1fr; }
+}
+
+/* Deleted projects dialog */
+.deleted-projects-button {
+  margin-left: auto;
+}
+
+.deleted-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 360px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.deleted-row {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #D0D0D0;
+  cursor: pointer;
+}
+
+.deleted-row input {
+  accent-color: var(--color-text-primary);
+  margin: 0;
+}
+
+.deleted-name {
+  font-weight: 700;
+}
+
+.deleted-meta {
+  font-size: var(--font-size-body);
+  font-weight: 300;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
 }
