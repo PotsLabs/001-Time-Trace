@@ -8,12 +8,13 @@ import { curveMonotoneX } from '@visx/curve';
 import { localPoint } from '@visx/event';
 import { TooltipWithBounds } from '@visx/tooltip';
 import { max } from 'd3-array';
-import { type Cycle, WEEKDAYS, cycleLength, durationTick, formatDuration, slotLabel } from './analytics';
+import LineSwatch from './LineSwatch';
+import { type Cycle, type SeriesStyle, WEEKDAYS, cycleLength, durationTick, formatDuration, slotLabel } from './analytics';
 
 export interface ProjectLine {
   id: number;
   name: string;
-  color: string;
+  style: SeriesStyle;
   values: number[]; // hours, or share (0–1) of the project's time
 }
 
@@ -74,7 +75,8 @@ const ProjectLines: React.FC<ProjectLinesProps> = ({ width, height, cycle, lines
 
           {lines.map(l => (
             <LinePath key={l.id} data={l.values} x={(_, i) => cx(i)} y={v => y(v)}
-              curve={curveMonotoneX} stroke={l.color} strokeWidth={2}
+              curve={curveMonotoneX} stroke={l.style.color} strokeLinecap="round"
+              strokeWidth={l.style.dashed ? 2.5 : 2} strokeDasharray={l.style.dashed ? '0.1 5' : undefined}
               strokeOpacity={highlightId == null || highlightId === l.id ? 1 : 0.15} />
           ))}
 
@@ -86,7 +88,7 @@ const ProjectLines: React.FC<ProjectLinesProps> = ({ width, height, cycle, lines
             <g pointerEvents="none">
               <Line from={{ x: cx(hover), y: 0 }} to={{ x: cx(hover), y: innerHeight }} stroke="var(--color-text-secondary)" strokeWidth={0.7} />
               {lines.map(l => (
-                <circle key={l.id} cx={cx(hover)} cy={y(l.values[hover])} r={4} fill={l.color}
+                <circle key={l.id} cx={cx(hover)} cy={y(l.values[hover])} r={4} fill={l.style.color}
                   stroke="var(--color-background)" strokeWidth={2} />
               ))}
             </g>
@@ -102,7 +104,7 @@ const ProjectLines: React.FC<ProjectLinesProps> = ({ width, height, cycle, lines
           <div className="chart-tooltip-label">{slotLabel(hover, cycle)}–{String((hover + 1) % 24).padStart(2, '0')}:00</div>
           {rows.map(l => (
             <div key={l.id} className="chart-tooltip-row">
-              <span><i className="legend-dot" style={{ background: l.color }} />{l.name}</span>
+              <span className="legend-item"><LineSwatch style={l.style} />{l.name}</span>
               <span>{format(l.values[hover])}</span>
             </div>
           ))}

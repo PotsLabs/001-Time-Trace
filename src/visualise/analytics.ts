@@ -47,6 +47,15 @@ export interface SeriesPoint {
   hours: number;
 }
 
+export interface SeriesStyle {
+  color: string;
+  dashed: boolean;
+}
+
+// Project lines: black, blue and two greys, then the same four dotted. Fixed order, never cycled.
+const SERIES_INKS = ['var(--series-ink)', 'var(--series-blue)', 'var(--series-grey-dark)', 'var(--series-grey-light)'];
+export const SERIES_STYLES: SeriesStyle[] = [false, true].flatMap(dashed => SERIES_INKS.map(color => ({ color, dashed })));
+
 export const toneColor: Record<CalloutTone, string> = {
   primary: 'var(--color-text-primary)',
   accent: 'var(--color-accent)',

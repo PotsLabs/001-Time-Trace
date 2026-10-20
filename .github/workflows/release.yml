@@ -1,0 +1,47 @@
+# Builds macOS and Windows installers when a version tag (v1.2.3) is pushed,
+# and uploads them to a draft GitHub Release for that tag.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # create the release and upload assets
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: --mac
+          - os: windows-latest
+            platform: --win
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build app
+        run: npm run icon:generate && npm run build && node electron/build.mjs
+
+      # Signs + notarizes on macOS when the Apple secrets exist; without them the app is
+      # ad-hoc signed so it opens via "Open Anyway" instead of reporting itself as damaged.
+      - name: Package and publish
+        run: npx electron-builder ${{ matrix.platform }} --publish always ${{ (matrix.os == 'macos-14' && secrets.MAC_CERT_P12_BASE64 == '') && '-c.mac.identity=- -c.mac.notarize=false' || '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

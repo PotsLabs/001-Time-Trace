@@ -6,13 +6,14 @@ import RangeBrush from './RangeBrush';
 import HourBars from './HourBars';
 import ProjectLines, { type ProjectLine } from './ProjectLines';
 import ProjectPicker from './ProjectPicker';
+import LineSwatch from './LineSwatch';
 import WeekScope from './WeekScope';
 import SummaryCard from './SummaryCard';
 import { buildDigest } from './digest';
 import {
   type Callout, type CalloutTone, type Cycle, type DateRange, type Entry, type Granularity, type Measure,
   type Metric, type Project, type SeriesPoint, type Session,
-  addDays, addProfiles, buildSeries, cycleProfile, foldToDay, formatDuration, formatHours, hoursByDay, hoursByProject,
+  SERIES_STYLES, addDays, addProfiles, buildSeries, cycleProfile, foldToDay, formatDuration, formatHours, hoursByDay, hoursByProject,
   inRange, placeUntimed, rangeDays, reconcileSessions, slotLabel, toKey, weekOf,
 } from './analytics';
 
@@ -36,8 +37,6 @@ const PRESETS: { label: string; range: () => DateRange | null }[] = [
 
 const GRANULARITIES: Granularity[] = ['day', 'week', 'month'];
 const TONES: CalloutTone[] = ['primary', 'accent', 'success'];
-const SERIES_SLOTS = 8; // categorical palette size (--series-1…8); never cycled
-const seriesColor = (slot: number) => `var(--series-${slot + 1})`;
 
 const Visualise: React.FC = () => {
   // One width for every chart: they all span the content column
@@ -90,7 +89,7 @@ const Visualise: React.FC = () => {
       const used = new Set(kept.values());
       for (const id of next) {
         if (kept.has(id)) continue;
-        const free = [...Array(SERIES_SLOTS).keys()].find(s => !used.has(s));
+        const free = [...SERIES_STYLES.keys()].find(s => !used.has(s));
         if (free == null) break;
         kept.set(id, free);
         used.add(free);
@@ -160,7 +159,7 @@ const Visualise: React.FC = () => {
       const values = lineScale === 'share'
         ? raw.map(v => (projectTotal ? v / projectTotal : 0))
         : raw.map(v => v / avgDivisor(lineCycle, scopeDays));
-      return { id, name: projectNames.get(id) ?? `#${id}`, color: seriesColor(slot), values };
+      return { id, name: projectNames.get(id) ?? `#${id}`, style: SERIES_STYLES[slot], values };
     });
 
   const dailyHours = useMemo(() => hoursByDay((data?.entries ?? []).filter(e => selected.has(e.project_id))), [data, selected]);
@@ -307,12 +306,12 @@ const Visualise: React.FC = () => {
             <div className="viz-legend">
               <ProjectPicker label="Compare" projects={data.projects} hours={projectHours}
                 selected={new Set(lineSlots.keys())} onChange={updateCompared}
-                colorFor={id => { const s = lineSlots.get(id); return s == null ? undefined : seriesColor(s); }}
-                maxSelected={SERIES_SLOTS} />
+                styleFor={id => { const s = lineSlots.get(id); return s == null ? undefined : SERIES_STYLES[s]; }}
+                maxSelected={SERIES_STYLES.length} />
               {lines.map(l => (
                 <span key={l.id} className="legend-item"
                   onMouseEnter={() => setHighlightId(l.id)} onMouseLeave={() => setHighlightId(null)}>
-                  <i className="legend-dot" style={{ background: l.color }} />{l.name}
+                  <LineSwatch style={l.style} />{l.name}
                 </span>
               ))}
             </div>

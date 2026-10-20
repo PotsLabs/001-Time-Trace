@@ -92,7 +92,12 @@
           ]
         }
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "electron/entitlements.mac.plist",
+      "entitlementsInherit": "electron/entitlements.mac.plist",
+      "notarize": true
     },
     "win": {
       "target": [
@@ -115,6 +120,14 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true
     },
-    "npmRebuild": true
+    "npmRebuild": true,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "PotsLabs",
+        "repo": "001-time-trace",
+        "releaseType": "draft"
+      }
+    ]
   }
 }

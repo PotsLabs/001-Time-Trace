@@ -1,6 +1,40 @@
 /* Design System CSS */
 /* Based on typography and color palette specifications */
 
+/* Bundled typeface: always these files, never whatever happens to be installed locally.
+   Weights are the files' real weights; CSS 200/300 resolve to Thin, 600 to Bold. */
+@font-face {
+  font-family: 'Blender Pro';
+  src: url('../assets/fonts/BlenderPro-Thin.ttf') format('truetype');
+  font-weight: 250;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Blender Pro';
+  src: url('../assets/fonts/BlenderPro-Book.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Blender Pro';
+  src: url('../assets/fonts/BlenderPro-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Blender Pro';
+  src: url('../assets/fonts/BlenderPro-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+}
+
 :root {
   /* Color Palette */
   --color-background: #ECECEC;
@@ -34,6 +68,19 @@ body {
   line-height: var(--line-height-body);
   margin: 0;
   padding: 30px;
+}
+
+/* Every control and chart label uses the app face: browsers give form controls the system font,
+   and SVG font-family attributes can't read CSS variables, so both are set here */
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+svg text {
+  font-family: var(--font-secondary);
 }
 
 /* Typography */
@@ -922,16 +969,11 @@ p {
 
 /* Visualise View */
 .visualise {
-  /* Categorical series palette, fixed order (validated on #ECECEC; slots 2–5 sit under 3:1,
-     so lines are always named in the legend and tooltip) */
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-6: #008300;
-  --series-7: #6250d6;
-  --series-8: #e34948;
+  /* Project line inks: black, blue, two greys (each also used dotted) */
+  --series-ink: var(--color-text-primary);
+  --series-blue: var(--color-accent);
+  --series-grey-dark: #6E6E6E;
+  --series-grey-light: #A8A8A8;
   /* Hand-entered time placed into hours: a recessive tone of the timed ink */
   --color-placed: #A6A6A6;
   --color-accent-soft: #8096F0;
@@ -1351,11 +1393,6 @@ p {
 .tone-accent { background-color: var(--color-accent); }
 .tone-success { background-color: var(--color-success); }
 
-/* Buttons inherit the app face (browsers default <button> to the system font) */
-.visualise button {
-  font-family: var(--font-secondary);
-}
-
 /* Legend + project picker */
 .viz-legend {
   display: flex;
@@ -1372,17 +1409,13 @@ p {
   cursor: default;
 }
 
-.legend-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
+.line-swatch {
+  flex-shrink: 0;
   vertical-align: middle;
 }
 
-.legend-item .legend-dot {
-  margin-right: 0;
+.chart-tooltip-row .legend-item {
+  font-size: 13px;
 }
 
 .project-picker {
@@ -1432,7 +1465,7 @@ p {
 
 .picker-option {
   display: grid;
-  grid-template-columns: 12px 1fr auto;
+  grid-template-columns: 20px 1fr auto;
   align-items: center;
   gap: 10px;
   width: 100%;
