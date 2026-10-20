@@ -38,6 +38,25 @@ db.exec(`
     duration INTEGER NOT NULL,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS callouts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    label TEXT NOT NULL,
+    note TEXT,
+    tone TEXT DEFAULT 'primary',
+    dx REAL DEFAULT 30,
+    dy REAL DEFAULT -40,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS summaries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    data_hash TEXT NOT NULL,
+    model TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 export default db;
